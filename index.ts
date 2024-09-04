@@ -1,3 +1,3 @@
-import { handleCli } from "./cli/cli";
+import { handleCli } from "./cli/cli"
 
-handleCli(process.argv)
+await handleCli(process.argv)

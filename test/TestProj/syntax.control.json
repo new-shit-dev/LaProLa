@@ -1,0 +1,82 @@
+{
+    "TYPES": {
+        "NUMBER": {
+            "PATTERN": [
+                {
+                    "value": "/[+-]? ?\\d?[.,]?\\d/",
+                    "isRegularExpression": true
+                }
+            ],
+            "BEHAVIOR": [
+                {
+                    "value": "js-number",
+                    "isRegularExpression": false
+                }
+            ]
+        }
+    },
+    "VARIABLES": {
+        "PATTERN": [
+            {
+                "value": "/^[A-Za-z_]\\w*/",
+                "isRegularExpression": true
+            }
+        ],
+        "DEFINITION": [
+            [
+                {
+                    "value": "pattern"
+                }
+            ],
+            [
+                {
+                    "value": "pattern"
+                },
+                {
+                    "value": " : ",
+                    "isRegularExpression": false
+                },
+                {
+                    "value": "type"
+                }
+            ]
+        ]
+    },
+    "BLOCK": {
+        "DEFINITION": [
+            {
+                "value": "{ ",
+                "isRegularExpression": false
+            },
+            {
+                "value": "content"
+            },
+            {
+                "value": " }",
+                "isRegularExpression": false
+            }
+        ]
+    },
+    "MEMORY MANAGEMENT": "NONE",
+    "CONDITION": {
+        "GENERIC": [
+            {
+                "value": "condition"
+            },
+            {
+                "value": " ? ",
+                "isRegularExpression": false
+            },
+            {
+                "value": "true"
+            },
+            {
+                "value": " : "
+            },
+            {
+                "value": "false",
+                "isRegularExpression": false
+            }
+        ]
+    }
+}
