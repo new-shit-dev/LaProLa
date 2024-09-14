@@ -22,55 +22,61 @@ export type LPLMConfig = {
 }
 
 export const LPLM_PARSER = new (class Parser {
-    private lines: string[] = []
-    private configFile?: LPLMConfig
-    private index: number = 0
+    private _lines: string[] = []
+    private _configFile?: LPLMConfig
+    private _lineIndex: number = 0
+    private _parsed = false
 
     parse(fileContent: string) {
         this._init()
-        this.lines = fileContent.split("\n")
+        this._lines = fileContent.split("\n")
         // I don't know if this code is even supposed to be legal
-        for (; this.index < this.lines.length; this.index++) {
-            if (this.lines[this.index].trim().startsWith("#")) {
+        for (; this._lineIndex < this._lines.length; this._lineIndex++) {
+            if (this._lines[this._lineIndex].trim().startsWith("#")) {
                 continue
             }
-            const [config, expr] = this.lines[this.index]
+            const [config, expr] = this._lines[this._lineIndex]
                 .split("=")
                 .map((values) => values.trim())
             switch (config) {
                 case "CONDITION GENERIC":
-                    this.configFile!.CONDITION = {
+                    this._configFile!.CONDITION = {
                         GENERIC: this._parseExpression(expr)!,
                     }
                     break
                 case "TYPES":
-                    this.configFile!.TYPES = this._parseObjectExpression()
+                    this._configFile!.TYPES = this._parseListObjectExpression()
                     break
                 case "VARIABLES":
-                    this.configFile!.VARIABLES = this._parseObjectExpression()
+                    this._configFile!.VARIABLES =
+                        this._parseListObjectExpression()
                     break
-                case "BLOCK STATEMENT":
-                    this.configFile!.BLOCK = this._parseObjectExpression()
+                case "BLOCK":
+                    this._configFile!.BLOCK = this._parseListObjectExpression()
                     break
                 case "MEMORY MANAGEMENT":
                     switch (expr) {
                         case "NONE":
-                            this.configFile!["MEMORY MANAGEMENT"] = "NONE"
+                            this._configFile!["MEMORY MANAGEMENT"] = "NONE"
                             break
                     }
                     break
             }
         }
+        this._parsed = true
     }
 
     getConfig() {
-        return this.configFile!
+        if (!this._parsed) {
+            throw "Not parsed yet lol"
+        }
+        return this._configFile!
     }
 
     private _init() {
-        this.index = 0
-        this.lines = []
-        this.configFile = {
+        this._lineIndex = 0
+        this._lines = []
+        this._configFile = {
             "MEMORY MANAGEMENT": "NONE",
             BLOCK: {
                 DEFINITION: [],
@@ -84,52 +90,135 @@ export const LPLM_PARSER = new (class Parser {
                 PATTERN: [],
             },
         }
+        this._parsed = false
     }
 
-    private _parseObjectExpression() {
+    private _parseListObjectExpression() {
         let obj: any = {}
+        let list: any[] = []
         let currentKeys: string[] = []
+
         do {
-            this.index++
-            if (this.lines[this.index].trim().startsWith("#")) {
+            this._lineIndex++
+            if (this._lines[this._lineIndex].trim().startsWith("#")) {
                 continue
             }
             const charBeforeEquals =
-                this.lines[this.index][this.lines[this.index].indexOf("=") - 1]
+                this._lines[this._lineIndex][
+                    this._lines[this._lineIndex].indexOf("=") - 1
+                ]
             if (charBeforeEquals === undefined || charBeforeEquals === "\\") {
+                this._parseListObject(list)
+                // means type=list
             } else {
-                const [config, expr] = this.lines[this.index].split("=")
-                let expression = this._parseExpression(expr.trim())
-                if (!expression) {
-                    currentKeys.push(config.trim().toUpperCase())
-                    obj[currentKeys[0]] = {}
-                    continue
-                } else {
-                    currentKeys = [config.trim().toUpperCase(), ...currentKeys]
+                const peekCharBeforeEquals =
+                    this._lines[this._lineIndex + 1][
+                        this._lines[this._lineIndex + 1].indexOf("=") - 1
+                    ]
+                if (
+                    peekCharBeforeEquals === undefined ||
+                    peekCharBeforeEquals === "\\"
+                ) {
+                    this._parseListObject(list, currentKeys)
+
                     const newObj = this.__recursiveAssignement2(
-                        { ...obj },
+                        structuredClone(obj),
                         currentKeys.toReversed(),
-                        expression
+                        list
                     )
-                    currentKeys.splice(0, 1)
-                    obj[currentKeys[0]] = {
-                        ...obj[currentKeys[0]],
-                        ...newObj[currentKeys[0]],
+                    obj = {
+                        ...obj,
+                        ...newObj,
                     }
+                } else {
+                    // if (list.length > 0) {
+                    //     this.__recursiveAssignement2(
+                    //         structuredClone(obj),
+                    //         currentKeys.toReversed(),
+                    //         list
+                    //     )
+                    //     list = []
+                    // }
+                    this._parsePureObject(obj, currentKeys)
+                    // obj[currentKeys[currentKeys.length - 1]] = {
+                    //     ...obj,
+                    //     ...newObj[currentKeys[currentKeys.length - 1]],
+                    // }
                 }
             }
         } while (
-            this.lines[this.index].endsWith(",") &&
-            !this.lines[this.index].endsWith(",,")
+            this._lines[this._lineIndex].endsWith(",") &&
+            !this._lines[this._lineIndex].endsWith(",,")
         )
+        if (list.length > 0) {
+            const newObj = this.__recursiveAssignement2(
+                structuredClone(obj),
+                currentKeys.toReversed(),
+                list
+            )
+            obj = {
+                ...obj,
+                ...newObj,
+            }
+        }
         return obj
+    }
+
+    private _parseListObject(list: any[], currentKeys?: string[]) {
+        if (this._lines[this._lineIndex].indexOf("=") === -1) {
+            list.push(
+                this._parseExpression(this._lines[this._lineIndex].trim())!
+            )
+        } else {
+            const [config, expr] = this._lines[this._lineIndex].split("=")
+            currentKeys!.push(config.trim().toUpperCase())
+            list.push(this._parseExpression(expr.trim())!)
+        }
+    }
+
+    private _parsePureObject(obj: any, currentKeys: string[]) {
+        const [config, expr] = this._lines[this._lineIndex].split("=")
+        let expression = this._parseExpression(expr.trim())
+        if (!expression) {
+            currentKeys.push(config.trim().toUpperCase())
+            obj[currentKeys[0]] = {}
+            return
+        }
+        currentKeys = [config.trim().toUpperCase(), ...currentKeys]
+        const newObj = this.__recursiveAssignement2(
+            structuredClone(obj),
+            currentKeys.toReversed(),
+            expression
+        )
+        if (currentKeys.length > 1) {
+            currentKeys.splice(0, 1)
+        }
+        if (obj[currentKeys[currentKeys.length - 1]]) {
+            obj[currentKeys[currentKeys.length - 1]] = {
+                ...obj[currentKeys[currentKeys.length - 1]],
+                ...newObj[currentKeys[currentKeys.length - 1]],
+            }
+        } else {
+            obj[currentKeys[currentKeys.length - 1]] =
+                newObj[currentKeys[currentKeys.length - 1]]
+        }
+        // else {
+        //     if (obj[currentKeys[0]]) {
+        //         obj[currentKeys[0]] = {
+        //             ...obj[currentKeys[0]],
+        //             ...newObj[currentKeys[0]],
+        //         }
+        //     } else {
+        //         obj[currentKeys[0]] = newObj[currentKeys[0]]
+        //     }
+        // }
     }
 
     private _parseExpression(expression: string) {
         let expressions: LPLMExpression[] = []
         let text = ""
         for (let i = 0; i < expression.length; i++) {
-            if (this.lines[this.index].trim().startsWith("#")) continue
+            if (this._lines[this._lineIndex].trim().startsWith("#")) continue
             if (expression[i] === "$") {
                 if (text) {
                     expressions.push(this._parseTextExpression(text))
@@ -167,22 +256,6 @@ export const LPLM_PARSER = new (class Parser {
         )
     }
 
-    // private __recursiveAssignement(
-    //     object: any,
-    //     propertyKeys: string[],
-    //     value: any
-    // ) {
-    //     if (propertyKeys.length > 1) {
-    //         propertyKeys.splice(0, 1)
-    //         object = this.__recursiveAssignement(object, propertyKeys, value)
-    //         debugger
-    //         object[propertyKeys[0]] = value
-    //     } else {
-    //         return object[propertyKeys[0]]
-    //     }
-    //     return object
-    // }
-
     private __recursiveAssignement2(
         object: any,
         propertyKeys: string[],
@@ -193,13 +266,12 @@ export const LPLM_PARSER = new (class Parser {
             propertyKeys.splice(0, 1)
             value = this.__recursiveAssignement2(object, propertyKeys, value)
             object[currentPropertyKey] = value
-            // console.log(object, currentPropertyKey, propertyKeys[0])
             return object
         } else {
             // if (object) {
             //     object[propertyKeys[0]] = value
-            //     return
             // }
+            // return object[propertyKeys[0]]
             return { [propertyKeys[0]]: value }
         }
     }

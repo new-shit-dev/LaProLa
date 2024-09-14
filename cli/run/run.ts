@@ -1,6 +1,8 @@
 import type { BunFile } from "bun"
 import { LPLM_PARSER, type LPLMConfig } from "../../lplm/parser/parser"
 import control from "../../test/TestProj/syntax.control.json"
+import { Parser } from "../../core/parser/parser"
+import { Lexer } from "../../core/lexer/lexer"
 
 export const runLplProject = async (cwd: string) => {
     const entryFile = await Bun.file(cwd + "/main.lpl")
@@ -15,9 +17,14 @@ const runLplMainFile = async (entryFile: BunFile, lplmFile: BunFile) => {
     const configFileContent = await lplmFile.text()
     LPLM_PARSER.parse(configFileContent)
     const config = LPLM_PARSER.getConfig()
-    printDebugTests(config)
-    console.log(JSON.stringify(control["CONDITION"]["GENERIC"]))
-    console.log(JSON.stringify(config["CONDITION"]["GENERIC"]))
+    const laProLaLexer = new Lexer(config)
+    laProLaLexer.tokenize(entryFileContent)
+    console.log(laProLaLexer.getTokens())
+    // printDebugTests(config)
+    // const laProLaParser = new Parser()
+
+    // console.log(JSON.stringify(control["TYPES"]))
+    // console.log(JSON.stringify(config["TYPES"]))
     // printTypesDebug(config)
 }
 
@@ -31,7 +38,8 @@ const printDebugTests = (config: LPLMConfig) => {
     console.log(
         "Cond test: " +
             (JSON.stringify(control["CONDITION"]["GENERIC"]) ===
-                JSON.stringify(config["CONDITION"]["GENERIC"]))
+                JSON.stringify(config["CONDITION"]["GENERIC"])) +
+            " as always"
     )
     console.log(
         "Var test: " +
@@ -46,7 +54,8 @@ const printDebugTests = (config: LPLMConfig) => {
     console.log(
         "Mem man test: " +
             (JSON.stringify(control["MEMORY MANAGEMENT"]) ===
-                JSON.stringify(config["MEMORY MANAGEMENT"]))
+                JSON.stringify(config["MEMORY MANAGEMENT"])) +
+            " as always"
     )
     console.log()
 }

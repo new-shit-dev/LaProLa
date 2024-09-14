@@ -71,11 +71,11 @@
                 "value": "true"
             },
             {
-                "value": " : "
+                "value": " : ",
+                "isRegularExpression": false
             },
             {
-                "value": "false",
-                "isRegularExpression": false
+                "value": "false"
             }
         ]
     }
